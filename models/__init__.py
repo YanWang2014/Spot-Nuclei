@@ -1,6 +1,7 @@
 #https://github.com/asanakoy/kaggle_carvana_segmentation
 
 from .linknet import LinkNet18 
+from .linknet import LinkNet34
 from .unet_models import UNet11 
 
 

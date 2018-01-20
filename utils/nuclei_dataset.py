@@ -13,6 +13,22 @@ nuclei:
      0.2959
      0.0000
 
+(Training examples, Test examples): ( 670 , 65 )
+(256, 256, 3) : 334
+(1024, 1024, 3) : 16
+(520, 696, 3) : 92
+(360, 360, 3) : 91
+(512, 640, 3) : 13
+(256, 320, 3) : 112
+(1040, 1388, 3) : 1
+(260, 347, 3) : 5
+(603, 1272, 3) : 6
+
+
+# todo: 
+    check if mask is only 0 and 1 (seems to be true)
+    load images of different size directly (very different sizes may be a big problem)
+    support CV
 '''
 
 from PIL import Image
@@ -22,7 +38,6 @@ import torch.utils.data as data
 import torch
 import numpy as np
 from utils import transforms_master
-import cv2
 from utils import functional_newest
 
 class NucleiDataset(data.Dataset):
@@ -60,13 +75,12 @@ class NucleiDataset(data.Dataset):
         
         if self.mode != 'test':
             mask = Image.open(mask_path)
-            #mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
         if self.transform:
             image = self.transform(image)
             if self.mode != 'test':
                 mask = functional_newest.to_grayscale(mask)
-                mask = self.transform(mask)
+                mask = self.transform(mask)  
         
         if self.mode != 'test':
             return image, mask, img_name

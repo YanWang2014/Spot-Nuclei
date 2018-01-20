@@ -7,8 +7,8 @@ import torch.nn.functional as F
 class UnetVgg11(nn.Module):
     def __init__(self, n_classes=1, num_filters=64, v=1):
         super(UnetVgg11, self).__init__()
-        print 'UnetVgg11 version={}'.format(v)
-        print 'base num_filters={}'.format(num_filters)
+        print ('UnetVgg11 version={}'.format(v))
+        print ('base num_filters={}'.format(num_filters))
 
         self.pool = nn.MaxPool2d(2, 2)
         self.encoder = torchvision.models.vgg11(pretrained=True).features
@@ -66,7 +66,7 @@ class Vgg11a(nn.Module):
     def __init__(self, n_classes=1, num_filters=32, v=1):
         super(Vgg11a, self).__init__()
         assert v in [1, 2]
-        print 'UnetVgg11a version={}'.format(v)
+        print ('UnetVgg11a version={}'.format(v))
 
         self.pool = nn.MaxPool2d(2, 2)
         self.encoder = torchvision.models.vgg11(pretrained=True).features

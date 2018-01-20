@@ -23,70 +23,20 @@ def run():
     else:
         criterion = opt.criterion
 
-    best_metric = 0
-    best_loss = 10000
-    
-    if opt.try_resume:
-        common.resume(model, 'latest', opt.model)
 
-
-    transformed_dataset_train = nuclei_dataset.NucleiDataset(root_dir=opt.train_data_root,
-                                             mode = 'train',
-                                             transform=opt.transforms['train'])
-    train_loader = data.DataLoader(transformed_dataset_train, 
-                                   batch_size=opt.batch_size,
-                                   shuffle=True, 
-                                   num_workers=opt.num_workers, 
-                                   pin_memory=opt.use_gpu)
     
     transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.train_data_root,
-                                             mode = 'val',
-                                             transform=opt.transforms['val'])
+                                             mode = 'test',
+                                             transform=opt.transforms['test'])
     val_loader = data.DataLoader(transformed_dataset_val, 
                                    batch_size=opt.batch_size,
                                    shuffle=False, 
                                    num_workers=opt.num_workers, 
                                    pin_memory=opt.use_gpu)
-    print(len(train_loader)*opt.batch_size)
     print(len(val_loader)*opt.batch_size)
-
-    if opt.optim_type == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay) 
-    elif opt.optim_type == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
     
-    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5)
+    metric, loss = validate(val_loader, model, criterion, epoch = 0)
 
-
-    for epoch in range(opt.epochs):
-
-        # train for one epoch
-        metric, loss = train(train_loader, model, criterion, optimizer, epoch)
-
-        # evaluate on validation set
-        metric, loss = validate(val_loader, model, criterion, epoch)
-
-        # remember best 
-        is_best = loss <= best_loss
-        best_loss = min(loss, best_loss)
-        if epoch % opt.save_freq == 0:
-            common.save_checkpoint_epoch({
-                    'epoch': epoch,
-                    'arch': opt.model,
-                    'state_dict': model.state_dict(),
-                    'best_metric': best_metric,
-                    'loss': loss
-                    },  epoch, opt.model)
-        if is_best:
-            common.save_checkpoint({
-                    'epoch': epoch,
-                    'arch': opt.model,
-                    'state_dict': model.state_dict(),
-                    'best_metric': best_metric,
-                    'loss': loss
-                    },  is_best, opt.model)
-    
-        lr_scheduler.step(loss)
 
 
 
@@ -127,7 +77,7 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
                 epoch, i, len(loader), loss=losses, metric=metrics))
 
 
-    print(' *Epoch:[{0}] Metric {metric.avg:.3f}  Loss {loss.avg:.4f}'
+    print(' *Epoch:[{0}] metric {metric.avg:.3f}  Loss {loss.avg:.4f}'
           .format(epoch, metric=metrics, loss=losses))
 
     return metrics.avg, losses.avg
@@ -135,11 +85,6 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
 
 def validate(val_loader, model, criterion, epoch):
     return _each_epoch('validate', val_loader, model, criterion, optimizer=None, epoch=epoch)
-
-
-def train(train_loader, model, criterion, optimizer, epoch):
-    return _each_epoch('train', train_loader, model, criterion, optimizer, epoch)
-
 
     
 if __name__ == '__main__':

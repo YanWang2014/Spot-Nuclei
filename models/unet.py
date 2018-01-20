@@ -13,9 +13,9 @@ class Unet4(nn.Module):
 
         if filters is None:
             filters = [64, 128, 256, 512, 1024]
-        print 'Unet4 filter sizes:', filters
+        print ('Unet4 filter sizes:', filters)
 
-        filters = [x / self.feature_scale for x in filters]
+        filters = [int(x / self.feature_scale) for x in filters]
 
         self.down1 = UnetDown(self.in_channels, filters[0], self.is_batchnorm)
         self.down2 = UnetDown(filters[0], filters[1], self.is_batchnorm)
@@ -58,9 +58,9 @@ class Unet5(nn.Module):
 
         if filters is None:
             filters = [64, 128, 256, 512, 1024, 1024]
-        print 'Unet5 filter sizes:', filters
+        print ('Unet5 filter sizes:', filters)
 
-        filters = [x / self.feature_scale for x in filters]
+        filters = [int(x / self.feature_scale) for x in filters]
 
         self.down1 = UnetDown(self.in_channels, filters[0], self.is_batchnorm)
         self.down2 = UnetDown(filters[0], filters[1], self.is_batchnorm)
@@ -104,9 +104,9 @@ class Unet(nn.Module):
 
         if filters is None:
             filters = [32, 64, 128, 256, 512, 1024, 1024]
-        print 'Unet filter sizes:', filters
+        print ('Unet filter sizes:', filters)
 
-        filters = [x / self.feature_scale for x in filters]
+        filters = [int(x / self.feature_scale) for x in filters]
 
         self.down1 = UnetDown(self.in_channels, filters[0], self.is_batchnorm)
         self.down2 = UnetDown(filters[0], filters[1], self.is_batchnorm)
@@ -156,9 +156,9 @@ class Unet7(nn.Module):
 
         if filters is None:
             filters = [32, 64, 128, 256, 512, 1024, 1024, 2048]
-        print 'Unet7 filter sizes:', filters
+        print ('Unet7 filter sizes:', filters)
 
-        filters = [x / self.feature_scale for x in filters]
+        filters = [int(x / self.feature_scale) for x in filters]
 
         self.down1 = UnetDown(self.in_channels, filters[0], self.is_batchnorm)
         self.down2 = UnetDown(filters[0], filters[1], self.is_batchnorm)
@@ -215,7 +215,7 @@ class UnetConvBlock(nn.Module):
                                  nn.BatchNorm2d(out_size),
                                  nn.ReLU())
             self.convs.append(conv)
-            for i in xrange(1, num_layers):
+            for i in range(1, num_layers):
                 conv = nn.Sequential(nn.Conv2d(out_size, out_size, 3, 1, padding=1),
                                      nn.BatchNorm2d(out_size),
                                      nn.ReLU())
@@ -225,7 +225,7 @@ class UnetConvBlock(nn.Module):
                                  nn.ReLU())
 
             self.convs.append(conv)
-            for i in xrange(1, num_layers):
+            for i in range(1, num_layers):
                 conv = nn.Sequential(nn.Conv2d(out_size, out_size, 3, 1, padding=1),
                                      nn.ReLU())
                 self.convs.append(conv)
@@ -240,6 +240,7 @@ class UnetConvBlock(nn.Module):
 class UnetDown(nn.Module):
     def __init__(self, in_size, out_size, is_batchnorm):
         super(UnetDown, self).__init__()
+        
         self.conv = UnetConvBlock(in_size, out_size, is_batchnorm, num_layers=2)
         self.pool = nn.MaxPool2d(2, 2)
 
