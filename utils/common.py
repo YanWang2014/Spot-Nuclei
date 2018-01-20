@@ -123,7 +123,24 @@ class BCEDiceLoss(nn.Module):
     def forward(self, input, target, weight=None):
         return nn.modules.loss.BCEWithLogitsLoss(size_average=self.size_average, weight=weight)(input, target) + self.dice(input, target, weight=weight)
 
+class UNet11_Loss:
+    def __init__(self, dice_weight=1):
+        self.nll_loss = nn.BCELoss()
+        self.dice_weight = dice_weight
 
+    def __call__(self, outputs, targets):
+        loss = self.nll_loss(outputs, targets)
+        if self.dice_weight:
+            eps = 1e-15
+            dice_target = (targets == 1).float()
+            dice_output = outputs
+            intersection = (dice_output * dice_target).sum()
+            union = dice_output.sum() + dice_target.sum() + eps
+
+            loss -= torch.log(2 * intersection / union)
+
+        return loss
+    
 def adjust_lr(optimizer, epoch, init_lr=0.1, num_epochs_per_decay=10, lr_decay_factor=0.1):
     lr = init_lr * (lr_decay_factor ** (epoch // num_epochs_per_decay))
     for param_group in optimizer.param_groups:
@@ -142,7 +159,8 @@ losses = {
     'BCELoss2d': BCELoss2d,
     'CrossEntropyLoss2d': CrossEntropyLoss2d,
     'SoftDiceLoss': SoftDiceLoss,
-    'BCEDiceLoss': BCEDiceLoss
+    'BCEDiceLoss': BCEDiceLoss,
+    'UNet11_Loss': UNet11_Loss
 }
 
 

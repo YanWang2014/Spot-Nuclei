@@ -8,7 +8,7 @@ class Config(object):
     test_data_root = 'data/stage1_test/' 
 
     
-    model = 'LinkNet18' # models/__init__.py
+    model = 'UNet11' # models/__init__.py
     num_classes = 1
     
     image_size = 224
@@ -31,11 +31,14 @@ class Config(object):
     momentum = 0.9
     weight_decay = 0#1e-4 
     
-    criterion = common.losses['BCELoss2d']()
+    if model == 'UNet11':
+        criterion = common.losses['UNet11_Loss']()
+    else:
+        criterion = common.losses['BCELoss2d']()   
     
     
-    use_gpu = False #torch.cuda.is_available()
-    use_multi_gpu = False #torch.cuda.device_count() > 1
+    use_gpu = torch.cuda.is_available()
+    use_multi_gpu = torch.cuda.device_count() > 1
     num_workers = 4 
     save_freq = 2
     if_debug = True
