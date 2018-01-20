@@ -13,507 +13,12 @@ import types
 import collections
 import warnings
 
-
-def _is_pil_image(img):
-    if accimage is not None:
-        return isinstance(img, (Image.Image, accimage.Image))
-    else:
-        return isinstance(img, Image.Image)
-
-
-def _is_tensor_image(img):
-    return torch.is_tensor(img) and img.ndimension() == 3
-
-
-def _is_numpy_image(img):
-    return isinstance(img, np.ndarray) and (img.ndim in {2, 3})
-
-
-def to_tensor(pic):
-    """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor.
-
-    See ``ToTensor`` for more details.
-
-    Args:
-        pic (PIL Image or numpy.ndarray): Image to be converted to tensor.
-
-    Returns:
-        Tensor: Converted image.
-    """
-    if not(_is_pil_image(pic) or _is_numpy_image(pic)):
-        raise TypeError('pic should be PIL Image or ndarray. Got {}'.format(type(pic)))
-
-    if isinstance(pic, np.ndarray):
-        # handle numpy array
-        img = torch.from_numpy(pic.transpose((2, 0, 1)))
-        # backward compatibility
-        return img.float().div(255)
-
-    if accimage is not None and isinstance(pic, accimage.Image):
-        nppic = np.zeros([pic.channels, pic.height, pic.width], dtype=np.float32)
-        pic.copyto(nppic)
-        return torch.from_numpy(nppic)
-
-    # handle PIL Image
-    if pic.mode == 'I':
-        img = torch.from_numpy(np.array(pic, np.int32, copy=False))
-    elif pic.mode == 'I;16':
-        img = torch.from_numpy(np.array(pic, np.int16, copy=False))
-    else:
-        img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
-    # PIL image mode: 1, L, P, I, F, RGB, YCbCr, RGBA, CMYK
-    if pic.mode == 'YCbCr':
-        nchannel = 3
-    elif pic.mode == 'I;16':
-        nchannel = 1
-    else:
-        nchannel = len(pic.mode)
-    img = img.view(pic.size[1], pic.size[0], nchannel)
-    # put it from HWC to CHW format
-    # yikes, this transpose takes 80% of the loading time/CPU
-    img = img.transpose(0, 1).transpose(0, 2).contiguous()
-    if isinstance(img, torch.ByteTensor):
-        return img.float().div(255)
-    else:
-        return img
-
-
-def to_pil_image(pic, mode=None):
-    """Convert a tensor or an ndarray to PIL Image.
-
-    See :class:`~torchvision.transforms.ToPIlImage` for more details.
-
-    Args:
-        pic (Tensor or numpy.ndarray): Image to be converted to PIL Image.
-        mode (`PIL.Image mode`_): color space and pixel depth of input data (optional).
-
-    .. _PIL.Image mode: http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#modes
-
-    Returns:
-        PIL Image: Image converted to PIL Image.
-    """
-    if not(_is_numpy_image(pic) or _is_tensor_image(pic)):
-        raise TypeError('pic should be Tensor or ndarray. Got {}.'.format(type(pic)))
-
-    npimg = pic
-    if isinstance(pic, torch.FloatTensor):
-        pic = pic.mul(255).byte()
-    if torch.is_tensor(pic):
-        npimg = np.transpose(pic.numpy(), (1, 2, 0))
-
-    if not isinstance(npimg, np.ndarray):
-        raise TypeError('Input pic must be a torch.Tensor or NumPy ndarray, ' +
-                        'not {}'.format(type(npimg)))
-
-    if npimg.shape[2] == 1:
-        expected_mode = None
-        npimg = npimg[:, :, 0]
-        if npimg.dtype == np.uint8:
-            expected_mode = 'L'
-        if npimg.dtype == np.int16:
-            expected_mode = 'I;16'
-        if npimg.dtype == np.int32:
-            expected_mode = 'I'
-        elif npimg.dtype == np.float32:
-            expected_mode = 'F'
-        if mode is not None and mode != expected_mode:
-            raise ValueError("Incorrect mode ({}) supplied for input type {}. Should be {}"
-                             .format(mode, np.dtype, expected_mode))
-        mode = expected_mode
-
-    elif npimg.shape[2] == 4:
-        permitted_4_channel_modes = ['RGBA', 'CMYK']
-        if mode is not None and mode not in permitted_4_channel_modes:
-            raise ValueError("Only modes {} are supported for 4D inputs".format(permitted_4_channel_modes))
-
-        if mode is None and npimg.dtype == np.uint8:
-            mode = 'RGBA'
-    else:
-        permitted_3_channel_modes = ['RGB', 'YCbCr', 'HSV']
-        if mode is not None and mode not in permitted_3_channel_modes:
-            raise ValueError("Only modes {} are supported for 3D inputs".format(permitted_3_channel_modes))
-        if mode is None and npimg.dtype == np.uint8:
-            mode = 'RGB'
-
-    if mode is None:
-        raise TypeError('Input type {} is not supported'.format(npimg.dtype))
-
-    return Image.fromarray(npimg, mode=mode)
-
-
-def normalize(tensor, mean, std):
-    """Normalize a tensor image with mean and standard deviation.
-
-    See ``Normalize`` for more details.
-
-    Args:
-        tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
-        mean (sequence): Sequence of means for each channel.
-        std (sequence): Sequence of standard deviations for each channely.
-
-    Returns:
-        Tensor: Normalized Tensor image.
-    """
-    if not _is_tensor_image(tensor):
-        raise TypeError('tensor is not a torch image.')
-    # TODO: make efficient
-    for t, m, s in zip(tensor, mean, std):
-        t.sub_(m).div_(s)
-    return tensor
-
-
-def resize(img, size, interpolation=Image.BILINEAR):
-    """Resize the input PIL Image to the given size.
-
-    Args:
-        img (PIL Image): Image to be resized.
-        size (sequence or int): Desired output size. If size is a sequence like
-            (h, w), the output size will be matched to this. If size is an int,
-            the smaller edge of the image will be matched to this number maintaing
-            the aspect ratio. i.e, if height > width, then image will be rescaled to
-            (size * height / width, size)
-        interpolation (int, optional): Desired interpolation. Default is
-            ``PIL.Image.BILINEAR``
-
-    Returns:
-        PIL Image: Resized image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-    if not (isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)):
-        raise TypeError('Got inappropriate size arg: {}'.format(size))
-
-    if isinstance(size, int):
-        w, h = img.size
-        if (w <= h and w == size) or (h <= w and h == size):
-            return img
-        if w < h:
-            ow = size
-            oh = int(size * h / w)
-            return img.resize((ow, oh), interpolation)
-        else:
-            oh = size
-            ow = int(size * w / h)
-            return img.resize((ow, oh), interpolation)
-    else:
-        return img.resize(size[::-1], interpolation)
-
-
-def scale(*args, **kwargs):
-    warnings.warn("The use of the transforms.Scale transform is deprecated, " +
-                  "please use transforms.Resize instead.")
-    return resize(*args, **kwargs)
-
-
-def pad(img, padding, fill=0):
-    """Pad the given PIL Image on all sides with the given "pad" value.
-
-    Args:
-        img (PIL Image): Image to be padded.
-        padding (int or tuple): Padding on each border. If a single int is provided this
-            is used to pad all borders. If tuple of length 2 is provided this is the padding
-            on left/right and top/bottom respectively. If a tuple of length 4 is provided
-            this is the padding for the left, top, right and bottom borders
-            respectively.
-        fill: Pixel fill value. Default is 0. If a tuple of
-            length 3, it is used to fill R, G, B channels respectively.
-
-    Returns:
-        PIL Image: Padded image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    if not isinstance(padding, (numbers.Number, tuple)):
-        raise TypeError('Got inappropriate padding arg')
-    if not isinstance(fill, (numbers.Number, str, tuple)):
-        raise TypeError('Got inappropriate fill arg')
-
-    if isinstance(padding, collections.Sequence) and len(padding) not in [2, 4]:
-        raise ValueError("Padding must be an int or a 2, or 4 element tuple, not a " +
-                         "{} element tuple".format(len(padding)))
-
-    return ImageOps.expand(img, border=padding, fill=fill)
-
-
-def crop(img, i, j, h, w):
-    """Crop the given PIL Image.
-
-    Args:
-        img (PIL Image): Image to be cropped.
-        i: Upper pixel coordinate.
-        j: Left pixel coordinate.
-        h: Height of the cropped image.
-        w: Width of the cropped image.
-
-    Returns:
-        PIL Image: Cropped image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    return img.crop((j, i, j + w, i + h))
-
-
-def resized_crop(img, i, j, h, w, size, interpolation=Image.BILINEAR):
-    """Crop the given PIL Image and resize it to desired size.
-
-    Notably used in RandomResizedCrop.
-
-    Args:
-        img (PIL Image): Image to be cropped.
-        i: Upper pixel coordinate.
-        j: Left pixel coordinate.
-        h: Height of the cropped image.
-        w: Width of the cropped image.
-        size (sequence or int): Desired output size. Same semantics as ``scale``.
-        interpolation (int, optional): Desired interpolation. Default is
-            ``PIL.Image.BILINEAR``.
-    Returns:
-        PIL Image: Cropped image.
-    """
-    assert _is_pil_image(img), 'img should be PIL Image'
-    img = crop(img, i, j, h, w)
-    img = resize(img, size, interpolation)
-    return img
-
-
-def hflip(img):
-    """Horizontally flip the given PIL Image.
-
-    Args:
-        img (PIL Image): Image to be flipped.
-
-    Returns:
-        PIL Image:  Horizontall flipped image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    return img.transpose(Image.FLIP_LEFT_RIGHT)
-
-
-def vflip(img):
-    """Vertically flip the given PIL Image.
-
-    Args:
-        img (PIL Image): Image to be flipped.
-
-    Returns:
-        PIL Image:  Vertically flipped image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    return img.transpose(Image.FLIP_TOP_BOTTOM)
-
-
-def five_crop(img, size):
-    """Crop the given PIL Image into four corners and the central crop.
-
-    .. Note::
-        This transform returns a tuple of images and there may be a
-        mismatch in the number of inputs and targets your ``Dataset`` returns.
-
-    Args:
-       size (sequence or int): Desired output size of the crop. If size is an
-           int instead of sequence like (h, w), a square crop (size, size) is
-           made.
-    Returns:
-        tuple: tuple (tl, tr, bl, br, center) corresponding top left,
-            top right, bottom left, bottom right and center crop.
-    """
-    if isinstance(size, numbers.Number):
-        size = (int(size), int(size))
-    else:
-        assert len(size) == 2, "Please provide only two dimensions (h, w) for size."
-
-    w, h = img.size
-    crop_h, crop_w = size
-    if crop_w > w or crop_h > h:
-        raise ValueError("Requested crop size {} is bigger than input size {}".format(size,
-                                                                                      (h, w)))
-    tl = img.crop((0, 0, crop_w, crop_h))
-    tr = img.crop((w - crop_w, 0, w, crop_h))
-    bl = img.crop((0, h - crop_h, crop_w, h))
-    br = img.crop((w - crop_w, h - crop_h, w, h))
-    center = CenterCrop((crop_h, crop_w))(img)
-    return (tl, tr, bl, br, center)
-
-
-def ten_crop(img, size, vertical_flip=False):
-    """Crop the given PIL Image into four corners and the central crop plus the
-       flipped version of these (horizontal flipping is used by default).
-
-    .. Note::
-        This transform returns a tuple of images and there may be a
-        mismatch in the number of inputs and targets your ``Dataset`` returns.
-
-       Args:
-           size (sequence or int): Desired output size of the crop. If size is an
-               int instead of sequence like (h, w), a square crop (size, size) is
-               made.
-           vertical_flip (bool): Use vertical flipping instead of horizontal
-
-        Returns:
-            tuple: tuple (tl, tr, bl, br, center, tl_flip, tr_flip, bl_flip,
-                br_flip, center_flip) corresponding top left, top right,
-                bottom left, bottom right and center crop and same for the
-                flipped image.
-    """
-    if isinstance(size, numbers.Number):
-        size = (int(size), int(size))
-    else:
-        assert len(size) == 2, "Please provide only two dimensions (h, w) for size."
-
-    first_five = five_crop(img, size)
-
-    if vertical_flip:
-        img = vflip(img)
-    else:
-        img = hflip(img)
-
-    second_five = five_crop(img, size)
-    return first_five + second_five
-
-
-def adjust_brightness(img, brightness_factor):
-    """Adjust brightness of an Image.
-
-    Args:
-        img (PIL Image): PIL Image to be adjusted.
-        brightness_factor (float):  How much to adjust the brightness. Can be
-            any non negative number. 0 gives a black image, 1 gives the
-            original image while 2 increases the brightness by a factor of 2.
-
-    Returns:
-        PIL Image: Brightness adjusted image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    enhancer = ImageEnhance.Brightness(img)
-    img = enhancer.enhance(brightness_factor)
-    return img
-
-
-def adjust_contrast(img, contrast_factor):
-    """Adjust contrast of an Image.
-
-    Args:
-        img (PIL Image): PIL Image to be adjusted.
-        contrast_factor (float): How much to adjust the contrast. Can be any
-            non negative number. 0 gives a solid gray image, 1 gives the
-            original image while 2 increases the contrast by a factor of 2.
-
-    Returns:
-        PIL Image: Contrast adjusted image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(contrast_factor)
-    return img
-
-
-def adjust_saturation(img, saturation_factor):
-    """Adjust color saturation of an image.
-
-    Args:
-        img (PIL Image): PIL Image to be adjusted.
-        saturation_factor (float):  How much to adjust the saturation. 0 will
-            give a black and white image, 1 will give the original image while
-            2 will enhance the saturation by a factor of 2.
-
-    Returns:
-        PIL Image: Saturation adjusted image.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    enhancer = ImageEnhance.Color(img)
-    img = enhancer.enhance(saturation_factor)
-    return img
-
-
-def adjust_hue(img, hue_factor):
-    """Adjust hue of an image.
-
-    The image hue is adjusted by converting the image to HSV and
-    cyclically shifting the intensities in the hue channel (H).
-    The image is then converted back to original image mode.
-
-    `hue_factor` is the amount of shift in H channel and must be in the
-    interval `[-0.5, 0.5]`.
-
-    See https://en.wikipedia.org/wiki/Hue for more details on Hue.
-
-    Args:
-        img (PIL Image): PIL Image to be adjusted.
-        hue_factor (float):  How much to shift the hue channel. Should be in
-            [-0.5, 0.5]. 0.5 and -0.5 give complete reversal of hue channel in
-            HSV space in positive and negative direction respectively.
-            0 means no shift. Therefore, both -0.5 and 0.5 will give an image
-            with complementary colors while 0 gives the original image.
-
-    Returns:
-        PIL Image: Hue adjusted image.
-    """
-    if not(-0.5 <= hue_factor <= 0.5):
-        raise ValueError('hue_factor is not in [-0.5, 0.5].'.format(hue_factor))
-
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    input_mode = img.mode
-    if input_mode in {'L', '1', 'I', 'F'}:
-        return img
-
-    h, s, v = img.convert('HSV').split()
-
-    np_h = np.array(h, dtype=np.uint8)
-    # uint8 addition take cares of rotation across boundaries
-    with np.errstate(over='ignore'):
-        np_h += np.uint8(hue_factor * 255)
-    h = Image.fromarray(np_h, 'L')
-
-    img = Image.merge('HSV', (h, s, v)).convert(input_mode)
-    return img
-
-
-def adjust_gamma(img, gamma, gain=1):
-    """Perform gamma correction on an image.
-
-    Also known as Power Law Transform. Intensities in RGB mode are adjusted
-    based on the following equation:
-
-        I_out = 255 * gain * ((I_in / 255) ** gamma)
-
-    See https://en.wikipedia.org/wiki/Gamma_correction for more details.
-
-    Args:
-        img (PIL Image): PIL Image to be adjusted.
-        gamma (float): Non negative real number. gamma larger than 1 make the
-            shadows darker, while gamma smaller than 1 make dark regions
-            lighter.
-        gain (float): The constant multiplier.
-    """
-    if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
-
-    if gamma < 0:
-        raise ValueError('Gamma should be a non-negative real number')
-
-    input_mode = img.mode
-    img = img.convert('RGB')
-
-    np_img = np.array(img, dtype=np.float32)
-    np_img = 255 * gain * ((np_img / 255) ** gamma)
-    np_img = np.uint8(np.clip(np_img, 0, 255))
-
-    img = Image.fromarray(np_img, 'RGB').convert(input_mode)
-    return img
+from utils import functional_newest as F
+
+__all__ = ["Compose", "ToTensor", "ToPILImage", "Normalize", "Resize", "Scale", "CenterCrop", "Pad",
+           "Lambda", "RandomCrop", "RandomHorizontalFlip", "RandomVerticalFlip", "RandomResizedCrop",
+           "RandomSizedCrop", "FiveCrop", "TenCrop", "LinearTransformation", "ColorJitter", "RandomRotation",
+           "Grayscale", "RandomGrayscale"]
 
 
 class Compose(object):
@@ -537,6 +42,14 @@ class Compose(object):
             img = t(img)
         return img
 
+    def __repr__(self):
+        format_string = self.__class__.__name__ + '('
+        for t in self.transforms:
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
+        return format_string
+
 
 class ToTensor(object):
     """Convert a ``PIL Image`` or ``numpy.ndarray`` to tensor.
@@ -553,7 +66,10 @@ class ToTensor(object):
         Returns:
             Tensor: Converted image.
         """
-        return to_tensor(pic)
+        return F.to_tensor(pic)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 class ToPILImage(object):
@@ -584,12 +100,15 @@ class ToPILImage(object):
             PIL Image: Image converted to PIL Image.
 
         """
-        return to_pil_image(pic, self.mode)
+        return F.to_pil_image(pic, self.mode)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '({0})'.format(self.mode)
 
 
 class Normalize(object):
     """Normalize an tensor image with mean and standard deviation.
-    Given mean: ``(M1,...,Mn)`` and std: ``(M1,..,Mn)`` for ``n`` channels, this transform
+    Given mean: ``(M1,...,Mn)`` and std: ``(S1,..,Sn)`` for ``n`` channels, this transform
     will normalize each channel of the input ``torch.*Tensor`` i.e.
     ``input[channel] = (input[channel] - mean[channel]) / std[channel]``
 
@@ -610,7 +129,10 @@ class Normalize(object):
         Returns:
             Tensor: Normalized Tensor image.
         """
-        return normalize(tensor, self.mean, self.std)
+        return F.normalize(tensor, self.mean, self.std)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
 class Resize(object):
@@ -639,7 +161,10 @@ class Resize(object):
         Returns:
             PIL Image: Rescaled image.
         """
-        return resize(img, self.size, self.interpolation)
+        return F.resize(img, self.size, self.interpolation)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class Scale(Resize):
@@ -667,23 +192,6 @@ class CenterCrop(object):
         else:
             self.size = size
 
-    @staticmethod
-    def get_params(img, output_size):
-        """Get parameters for ``crop`` for center crop.
-
-        Args:
-            img (PIL Image): Image to be cropped.
-            output_size (tuple): Expected output size of the crop.
-
-        Returns:
-            tuple: params (i, j, h, w) to be passed to ``crop`` for center crop.
-        """
-        w, h = img.size
-        th, tw = output_size
-        i = int(round((h - th) / 2.))
-        j = int(round((w - tw) / 2.))
-        return i, j, th, tw
-
     def __call__(self, img):
         """
         Args:
@@ -692,8 +200,10 @@ class CenterCrop(object):
         Returns:
             PIL Image: Cropped image.
         """
-        i, j, h, w = self.get_params(img, self.size)
-        return crop(img, i, j, h, w)
+        return F.center_crop(img, self.size)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class Pad(object):
@@ -727,7 +237,10 @@ class Pad(object):
         Returns:
             PIL Image: Padded image.
         """
-        return pad(img, self.padding, self.fill)
+        return F.pad(img, self.padding, self.fill)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(padding={0})'.format(self.padding)
 
 
 class Lambda(object):
@@ -743,6 +256,9 @@ class Lambda(object):
 
     def __call__(self, img):
         return self.lambd(img)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 class RandomCrop(object):
@@ -794,11 +310,14 @@ class RandomCrop(object):
             PIL Image: Cropped image.
         """
         if self.padding > 0:
-            img = pad(img, self.padding)
+            img = F.pad(img, self.padding)
 
         i, j, h, w = self.get_params(img, self.size)
 
-        return crop(img, i, j, h, w)
+        return F.crop(img, i, j, h, w)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class RandomHorizontalFlip(object):
@@ -813,8 +332,11 @@ class RandomHorizontalFlip(object):
             PIL Image: Randomly flipped image.
         """
         if random.random() < 0.5:
-            return hflip(img)
+            return F.hflip(img)
         return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 class RandomVerticalFlip(object):
@@ -829,33 +351,42 @@ class RandomVerticalFlip(object):
             PIL Image: Randomly flipped image.
         """
         if random.random() < 0.5:
-            return vflip(img)
+            return F.vflip(img)
         return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 class RandomResizedCrop(object):
     """Crop the given PIL Image to random size and aspect ratio.
 
-    A crop of random size of (0.08 to 1.0) of the original size and a random
-    aspect ratio of 3/4 to 4/3 of the original aspect ratio is made. This crop
+    A crop of random size (default: of 0.08 to 1.0) of the original size and a random
+    aspect ratio (default: of 3/4 to 4/3) of the original aspect ratio is made. This crop
     is finally resized to given size.
     This is popularly used to train the Inception networks.
 
     Args:
         size: expected output size of each edge
+        scale: range of size of the origin size cropped
+        ratio: range of aspect ratio of the origin aspect ratio cropped
         interpolation: Default: PIL.Image.BILINEAR
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR):
         self.size = (size, size)
         self.interpolation = interpolation
+        self.scale = scale
+        self.ratio = ratio
 
     @staticmethod
-    def get_params(img):
+    def get_params(img, scale, ratio):
         """Get parameters for ``crop`` for a random sized crop.
 
         Args:
             img (PIL Image): Image to be cropped.
+            scale (tuple): range of size of the origin size cropped
+            ratio (tuple): range of aspect ratio of the origin aspect ratio cropped
 
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for a random
@@ -863,8 +394,8 @@ class RandomResizedCrop(object):
         """
         for attempt in range(10):
             area = img.size[0] * img.size[1]
-            target_area = random.uniform(0.08, 1.0) * area
-            aspect_ratio = random.uniform(3. / 4, 4. / 3)
+            target_area = random.uniform(*scale) * area
+            aspect_ratio = random.uniform(*ratio)
 
             w = int(round(math.sqrt(target_area * aspect_ratio)))
             h = int(round(math.sqrt(target_area / aspect_ratio)))
@@ -891,8 +422,11 @@ class RandomResizedCrop(object):
         Returns:
             PIL Image: Randomly cropped and resize image.
         """
-        i, j, h, w = self.get_params(img)
-        return resized_crop(img, i, j, h, w, self.size, self.interpolation)
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        return F.resized_crop(img, i, j, h, w, self.size, self.interpolation)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class RandomSizedCrop(RandomResizedCrop):
@@ -906,15 +440,27 @@ class RandomSizedCrop(RandomResizedCrop):
 
 
 class FiveCrop(object):
-    """Crop the given PIL Image into four corners and the central crop.abs
+    """Crop the given PIL Image into four corners and the central crop
 
-       Note: this transform returns a tuple of images and there may be a mismatch in the number of
-       inputs and targets your `Dataset` returns.
+    .. Note::
+         This transform returns a tuple of images and there may be a mismatch in the number of
+         inputs and targets your Dataset returns. See below for an example of how to deal with
+         this.
 
-       Args:
-           size (sequence or int): Desired output size of the crop. If size is an
-               int instead of sequence like (h, w), a square crop (size, size) is
-               made.
+    Args:
+         size (sequence or int): Desired output size of the crop. If size is an ``int``
+            instead of sequence like (h, w), a square crop of size (size, size) is made.
+
+    Example:
+         >>> transform = Compose([
+         >>>    FiveCrop(size), # this is a list of PIL Images
+         >>>    Lambda(lambda crops: torch.stack([ToTensor()(crop) for crop in crops])) # returns a 4D tensor
+         >>> ])
+         >>> #In your test loop you can do the following:
+         >>> input, target = batch # input is a 5d tensor, target is 2d
+         >>> bs, ncrops, c, h, w = input.size()
+         >>> result = model(input.view(-1, c, h, w)) # fuse batch size and ncrops
+         >>> result_avg = result.view(bs, ncrops, -1).mean(1) # avg over crops
     """
 
     def __init__(self, size):
@@ -926,21 +472,37 @@ class FiveCrop(object):
             self.size = size
 
     def __call__(self, img):
-        return five_crop(img, self.size)
+        return F.five_crop(img, self.size)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class TenCrop(object):
-    """Crop the given PIL Image into four corners and the central crop plus the
-       flipped version of these (horizontal flipping is used by default)
+    """Crop the given PIL Image into four corners and the central crop plus the flipped version of
+    these (horizontal flipping is used by default)
 
-       Note: this transform returns a tuple of images and there may be a mismatch in the number of
-       inputs and targets your `Dataset` returns.
+    .. Note::
+         This transform returns a tuple of images and there may be a mismatch in the number of
+         inputs and targets your Dataset returns. See below for an example of how to deal with
+         this.
 
-       Args:
-           size (sequence or int): Desired output size of the crop. If size is an
-               int instead of sequence like (h, w), a square crop (size, size) is
-               made.
-           vertical_flip(bool): Use vertical flipping instead of horizontal
+    Args:
+        size (sequence or int): Desired output size of the crop. If size is an
+            int instead of sequence like (h, w), a square crop (size, size) is
+            made.
+        vertical_flip(bool): Use vertical flipping instead of horizontal
+
+    Example:
+         >>> transform = Compose([
+         >>>    TenCrop(size), # this is a list of PIL Images
+         >>>    Lambda(lambda crops: torch.stack([ToTensor()(crop) for crop in crops])) # returns a 4D tensor
+         >>> ])
+         >>> #In your test loop you can do the following:
+         >>> input, target = batch # input is a 5d tensor, target is 2d
+         >>> bs, ncrops, c, h, w = input.size()
+         >>> result = model(input.view(-1, c, h, w)) # fuse batch size and ncrops
+         >>> result_avg = result.view(bs, ncrops, -1).mean(1) # avg over crops
     """
 
     def __init__(self, size, vertical_flip=False):
@@ -953,7 +515,10 @@ class TenCrop(object):
         self.vertical_flip = vertical_flip
 
     def __call__(self, img):
-        return ten_crop(img, self.size, self.vertical_flip)
+        return F.ten_crop(img, self.size, self.vertical_flip)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
 
 
 class LinearTransformation(object):
@@ -996,6 +561,11 @@ class LinearTransformation(object):
         tensor = transformed_tensor.view(tensor.size())
         return tensor
 
+    def __repr__(self):
+        format_string = self.__class__.__name__ + '('
+        format_string += (str(self.transformation_matrix.numpy().tolist()) + ')')
+        return format_string
+
 
 class ColorJitter(object):
     """Randomly change the brightness, contrast and saturation of an image.
@@ -1029,19 +599,19 @@ class ColorJitter(object):
         transforms = []
         if brightness > 0:
             brightness_factor = np.random.uniform(max(0, 1 - brightness), 1 + brightness)
-            transforms.append(Lambda(lambda img: adjust_brightness(img, brightness_factor)))
+            transforms.append(Lambda(lambda img: F.adjust_brightness(img, brightness_factor)))
 
         if contrast > 0:
             contrast_factor = np.random.uniform(max(0, 1 - contrast), 1 + contrast)
-            transforms.append(Lambda(lambda img: adjust_contrast(img, contrast_factor)))
+            transforms.append(Lambda(lambda img: F.adjust_contrast(img, contrast_factor)))
 
         if saturation > 0:
             saturation_factor = np.random.uniform(max(0, 1 - saturation), 1 + saturation)
-            transforms.append(Lambda(lambda img: adjust_saturation(img, saturation_factor)))
+            transforms.append(Lambda(lambda img: F.adjust_saturation(img, saturation_factor)))
 
         if hue > 0:
             hue_factor = np.random.uniform(-hue, hue)
-            transforms.append(Lambda(lambda img: adjust_hue(img, hue_factor)))
+            transforms.append(Lambda(lambda img: F.adjust_hue(img, hue_factor)))
 
         np.random.shuffle(transforms)
         transform = Compose(transforms)
@@ -1059,3 +629,131 @@ class ColorJitter(object):
         transform = self.get_params(self.brightness, self.contrast,
                                     self.saturation, self.hue)
         return transform(img)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+
+class RandomRotation(object):
+    """Rotate the image by angle.
+
+    Args:
+        degrees (sequence or float or int): Range of degrees to select from.
+            If degrees is a number instead of sequence like (min, max), the range of degrees
+            will be (-degrees, +degrees).
+        resample ({PIL.Image.NEAREST, PIL.Image.BILINEAR, PIL.Image.BICUBIC}, optional):
+            An optional resampling filter.
+            See http://pillow.readthedocs.io/en/3.4.x/handbook/concepts.html#filters
+            If omitted, or if the image has mode "1" or "P", it is set to PIL.Image.NEAREST.
+        expand (bool, optional): Optional expansion flag.
+            If true, expands the output to make it large enough to hold the entire rotated image.
+            If false or omitted, make the output image the same size as the input image.
+            Note that the expand flag assumes rotation around the center and no translation.
+        center (2-tuple, optional): Optional center of rotation.
+            Origin is the upper left corner.
+            Default is the center of the image.
+    """
+
+    def __init__(self, degrees, resample=False, expand=False, center=None):
+        if isinstance(degrees, numbers.Number):
+            if degrees < 0:
+                raise ValueError("If degrees is a single number, it must be positive.")
+            self.degrees = (-degrees, degrees)
+        else:
+            if len(degrees) != 2:
+                raise ValueError("If degrees is a sequence, it must be of len 2.")
+            self.degrees = degrees
+
+        self.resample = resample
+        self.expand = expand
+        self.center = center
+
+    @staticmethod
+    def get_params(degrees):
+        """Get parameters for ``rotate`` for a random rotation.
+
+        Returns:
+            sequence: params to be passed to ``rotate`` for random rotation.
+        """
+        angle = np.random.uniform(degrees[0], degrees[1])
+
+        return angle
+
+    def __call__(self, img):
+        """
+            img (PIL Image): Image to be rotated.
+
+        Returns:
+            PIL Image: Rotated image.
+        """
+
+        angle = self.get_params(self.degrees)
+
+        return F.rotate(img, angle, self.resample, self.expand, self.center)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(degrees={0})'.format(self.degrees)
+
+
+class Grayscale(object):
+    """Convert image to grayscale.
+
+    Args:
+        num_output_channels (int): (1 or 3) number of channels desired for output image
+
+    Returns:
+        PIL Image: Grayscale version of the input.
+        - If num_output_channels == 1 : returned image is single channel
+        - If num_output_channels == 3 : returned image is 3 channel with r == g == b
+
+    """
+
+    def __init__(self, num_output_channels=1):
+        self.num_output_channels = num_output_channels
+
+    def __call__(self, img):
+        """
+        Args:
+            img (PIL Image): Image to be converted to grayscale.
+
+        Returns:
+            PIL Image: Randomly grayscaled image.
+        """
+        return F.to_grayscale(img, num_output_channels=self.num_output_channels)
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
+
+
+class RandomGrayscale(object):
+    """Randomly convert image to grayscale with a probability of p (default 0.1).
+
+    Args:
+        p (float): probability that image should be converted to grayscale.
+
+    Returns:
+        PIL Image: Grayscale version of the input image with probability p and unchanged
+        with probability (1-p).
+        - If input image is 1 channel: grayscale version is 1 channel
+        - If input image is 3 channel: grayscale version is 3 channel with r == g == b
+
+    """
+
+    def __init__(self, p=0.1):
+        self.p = p
+
+    def __call__(self, img):
+        """
+        Args:
+            img (PIL Image): Image to be converted to grayscale.
+
+        Returns:
+            PIL Image: Randomly grayscaled image.
+        """
+        num_output_channels = 1 if img.mode == 'L' else 3
+        if random.random() < self.p:
+            return F.to_grayscale(img, num_output_channels=num_output_channels)
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'

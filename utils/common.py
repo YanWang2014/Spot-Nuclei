@@ -1,9 +1,14 @@
 import torch
 import torch.nn as nn
 import shutil
-import torch.nn.functional as F
+from utils import functional_newest as F
+import torch.nn.functional as Fn
+
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+from skimage import morphology
+import pandas as pd
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -83,7 +88,7 @@ class BCELoss2d(nn.Module):
         self.bce_loss = nn.BCELoss(weight, size_average)
 
     def forward(self, logits, targets):
-        probs        = F.sigmoid(logits)
+        probs        = Fn.sigmoid(logits)
         probs_flat   = probs.view (-1)
         targets_flat = targets.view(-1)
         return self.bce_loss(probs_flat, targets_flat)
@@ -96,7 +101,7 @@ class SoftDiceLoss(nn.Module):
 
     def forward(self, logits, targets):
 
-        probs = F.sigmoid(logits)
+        probs = Fn.sigmoid(logits)
         num = targets.size(0)
         m1  = probs.view(num,-1)
         m2  = targets.view(num,-1)
@@ -133,7 +138,7 @@ class DiceLoss(nn.Module):
         self.size_average = size_average
 
     def forward(self, input, target, weight=None):
-        return 1-dice_loss(F.sigmoid(input), target, weight=weight, is_average=self.size_average)
+        return 1-dice_loss(Fn.sigmoid(input), target, weight=weight, is_average=self.size_average)
 
 class BCEDiceLoss(nn.Module):
     def __init__(self, size_average=True):
@@ -187,8 +192,79 @@ losses = {
 } # more complex loss: https://github.com/asanakoy/kaggle_carvana_segmentation/blob/master/asanakoy/losses.py
 
 
+def plot_tensor(inp2):
+    """Imshow for Tensor. BCHW"""
+    mean = np.array([0.1707, 0.1552, 0.1891])
+    std = np.array([0.2635, 0.2432, 0.2959])
+    inp2 = inp2[0,:,:,:]
+    inp2 = inp2.numpy().transpose((1, 2, 0)) # hwc
+    print(inp2.shape)
+    inp2 = std*inp2 + mean
+    print(inp2.max())
+    print(inp2.min())
+    inp2 = np.clip(inp2, 0, 1)
+    plt.figure()
+    plt.imshow(inp2)
+    plt.pause(5)
+    
+def plot_tensor_mask(inp):    
+    inp = inp[0,:,:,:]
+    inp = inp.numpy().transpose((1, 2, 0))
+    inp = inp[:,:,0] #HW
+    print(inp.shape)
+    print(inp.max())
+    print(inp.min())
+    plt.figure()
+    plt.imshow(inp, cmap='gray')
+    plt.pause(5)
+    
 def metric(output, mask_var):
-    return np.zeros(output.size(0))
+    """https://www.kaggle.com/wcukierski/example-metric-implementation
+    https://www.kaggle.com/c/data-science-bowl-2018/discussion/47756
+    """
+    predicts = Fn.sigmoid(output)
+    return np.zeros(predicts.size(0))
 
-def submit():
-    pass
+def run_length_encoding(x):
+    dots = np.where(x.T.flatten() == 1)[0]
+    run_lengths = []
+    prev = -2
+    for b in dots:
+        if (b>prev+1): run_lengths.extend((b + 1, 0))
+        run_lengths[-1] += 1
+        prev = b
+    run_lengths = ' '.join([str(r) for r in run_lengths])
+    return run_lengths
+
+def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
+    """predicts: BCHW tensor.
+       img_size: (H, W)
+    """
+    ImageId = []
+    EncodedPixels = []
+    for i in range(predicts.size(0)): #[0 , 1]
+        resized_PIL = F.resize(F.to_pil_image(predicts[i,:,:,:]), tuple(img_size[i,:]))
+        resized_np = np.array(resized_PIL) # [0, 1] converted into [0, 255]
+#        print(resized_np.max())
+#        print(resized_np.min())
+#        print(resized_np.shape)
+        resized_bool = resized_np>=(th*255)
+        
+        label = morphology.label(resized_bool)
+        num = label.max()+1
+        for m in range(1, num):
+            rle = run_length_encoding(label==m)
+            ImageId.append(img_name[i])
+            EncodedPixels.append(rle)    
+    return ImageId, EncodedPixels
+
+def write2csv(file, ImageId, EncodedPixels):
+    df = pd.DataFrame({ 'ImageId' : ImageId , 'EncodedPixels' : EncodedPixels})
+    df.to_csv(file, index=False, columns=['ImageId', 'EncodedPixels'])
+
+'''
+https://www.kaggle.com/kmader/nuclei-overview-to-submission  基于形态学清理mask。
+考虑一些奇怪的(重叠，圆环，密集)，是否用instances分割会更好【感觉会，因为不涉及后面的后处理，
+尤其是将整图的mask分割为小masks这一步】？
+'''
+    

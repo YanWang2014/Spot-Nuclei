@@ -12,7 +12,6 @@ def loader(model, num_classes):
 
     
     if model == 'UNet11':
-        
         return unet_models.UNet11(num_classes=num_classes) #ternaus
     
     if model == 'UnetVgg11':

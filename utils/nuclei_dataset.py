@@ -27,8 +27,10 @@ nuclei:
 
 # todo: 
     check if mask is only 0 and 1 (seems to be true)
-    load images of different size directly (very different sizes may be a big problem)
+    load images of different size directly (very different sizes may be a big problem). And maybe masks 
+        should not be resized: resize images, predict, resize back, calculate loss and metric
     support CV
+    support more transforms, especially random ones
 '''
 
 from PIL import Image
@@ -38,7 +40,10 @@ import torch.utils.data as data
 import torch
 import numpy as np
 from utils import transforms_master
-from utils import functional_newest
+from utils import functional_newest as F
+import random
+
+normalize = transforms_master.Normalize(mean=[0.1707, 0.1552, 0.1891], std=[0.2635, 0.2432, 0.2959])
 
 class NucleiDataset(data.Dataset):
 
@@ -72,20 +77,31 @@ class NucleiDataset(data.Dataset):
         image = Image.open(img_path)
         if image.mode == 'RGBA':
             image = self.pil_alpha_to_color_v2(image)
+        image_size = image.size
         
         if self.mode != 'test':
             mask = Image.open(mask_path)
+         
+        if self.mode == 'train':
+            # random transforms of PIL images here
+            if random.random() < 0.5:
+                image = F.hflip(image)
+                mask = F.hflip(mask)
+            if random.random() <0.5:
+                image = F.vflip(image)
+                mask = F.vflip(mask)            
 
         if self.transform:
             image = self.transform(image)
+#            image = normalize(image)
             if self.mode != 'test':
-                mask = functional_newest.to_grayscale(mask)
+                mask = F.to_grayscale(mask)
                 mask = self.transform(mask)  
-        
+#        print(image.size())
         if self.mode != 'test':
             return image, mask, img_name
         else:
-            return image, img_name
+            return image, img_name, np.array(image_size)
     
     def pil_alpha_to_color_v2(self, image, color=(255, 255, 255)):
         """Alpha composite an RGBA Image with a specified color.
@@ -97,6 +113,8 @@ class NucleiDataset(data.Dataset):
         Keyword Arguments:
         image -- PIL RGBA Image object
         color -- Tuple r, g, b (default 255, 255, 255)
+        
+        return PIL L
     
         """
         image.load()  # needed for split()
@@ -152,23 +170,23 @@ if __name__ == "__main__":
     dataloader = data.DataLoader(transformed_dataset_test, batch_size=batch_size,shuffle=False, num_workers=INPUT_WORKERS)
 
     
-#    #calculate mean and variance
-#    mean_meter = AverageMeter()
-#    for i, (image, mask, img_name) in enumerate(dataloader):  # nchw
-#        if i%10 ==0:
-#            print(i)
-#        mean_meter.update(image.mean(dim=0, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True), image.size(0))  
-#    
-#    mean = mean_meter.avg
-#    print(mean.squeeze())
-#    std_meter =  AverageMeter()
-#    for i, (image, mask, img_name) in enumerate(dataloader):  # nchw
-#        if i%10 ==0:
-#            print(i)
-#        std_meter.update(((image-mean)**2).mean(dim=0, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True), image.size(0))  
-#    print(std_meter.avg.squeeze().sqrt())
-#    
-#    
+    #calculate mean and variance
+    mean_meter = AverageMeter()
+    for i, (image, mask, img_name) in enumerate(dataloader):  # nchw
+        if i%10 ==0:
+            print(i)
+        mean_meter.update(image.mean(dim=0, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True), image.size(0))  
+    
+    mean = mean_meter.avg
+    print(mean.squeeze())
+    std_meter =  AverageMeter()
+    for i, (image, mask, img_name) in enumerate(dataloader):  # nchw
+        if i%10 ==0:
+            print(i)
+        std_meter.update(((image-mean)**2).mean(dim=0, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True), image.size(0))  
+    print(std_meter.avg.squeeze().sqrt())
+    
+    
     
     
     
