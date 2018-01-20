@@ -1,0 +1,8 @@
+For  https://www.kaggle.com/c/data-science-bowl-2018.
+
+CNNs:
+        Linknet, Unet-like CNNs from https://github.com/asanakoy/kaggle_carvana_segmentation, which may have been tuned further.
+        
+        Mask R-CNN like methods (possibly).
+        
+Others.
