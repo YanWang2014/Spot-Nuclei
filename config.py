@@ -31,16 +31,17 @@ class Config(object):
                  }
 
     
-    batch_size = 16
+    batch_size = 12
     epochs = 200
-    save_freq = 100
+    save_freq = 20
 
-    optim_type = 'SGD'
-    lr = 0.01 # 0.001
+    optim_type = 'Adam'
+    lr = 0.001 # 0.001
     momentum = 0.9
     weight_decay = 0#1e-4 
     
     criterion = common.losses['BCEDiceLoss']()
+    metric = common.metrics['mean_image_IoU']()
     
     
     use_gpu = torch.cuda.is_available()
@@ -48,7 +49,9 @@ class Config(object):
     num_workers = 4 
     
     if_debug = False
-    print_freq = 10
+    print_freq = 1
+    
+    seg_th = 0.5
 
 
 opt = Config()

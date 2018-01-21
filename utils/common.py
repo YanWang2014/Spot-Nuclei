@@ -121,7 +121,7 @@ def dice_loss(preds, trues, weight=None, is_average=True):
         trues = trues * w
     intersection = (preds * trues).sum(1)
     scores = 2. * (intersection + 1) / (preds.sum(1) + trues.sum(1) + 1) # soft dice
-   # scores = 2. * (intersection) / (preds.sum(1) + trues.sum(1) + 1e-15)
+#    scores = 2. * (intersection) / (preds.sum(1) + trues.sum(1) + 1e-15)
 
     if is_average:
         score = scores.sum()/num
@@ -287,17 +287,56 @@ def write2csv(file, ImageId, EncodedPixels):
 
 
     
-def IoU(output, mask_var):
+class mean_image_IoU:
     """Used during training and val on transformed masks
+    args: a batch of Tensor
     """
-    predicts = Fn.sigmoid(output)
-    return np.zeros(predicts.size(0))
+    def __call__(self, preds, trues, th):
+#        print("IoU")
+#        print(output.size())
+#        print(trues.size())
+        preds = preds.numpy()
+        trues = trues.numpy()
+        bs = preds.shape[0]
+        
+        preds[preds<(th)] = 0
+        preds[preds>=(th)] = 1
+        trues[trues<(th)] = 0
+        trues[trues>=(th)] = 1    
+        
+        m_iou = 0
+        for i in range(bs):
+            
+            intersection = \
+                np.histogram2d(trues[i,:,:,:].flatten(), preds[i,:,:,:].flatten(), bins=(2, 2))[0]
+        
+            area_true = np.histogram(trues[i,:,:,:], bins = 2)[0]
+            area_pred = np.histogram(preds[i,:,:,:], bins = 2)[0]
+            area_true = np.expand_dims(area_true, -1)
+            area_pred = np.expand_dims(area_pred, 0)    
+            
+            union = area_true + area_pred - intersection
+            
+            intersection = intersection[1:,1:]
+            union = union[1:,1:]
+            union[union == 0] = 1e-9
+        
+            iou = intersection / union 
+            m_iou += iou[0][0]
+    
+        return m_iou/bs
 
 def metric (output_logits, encodings):
     """For validation set on original masks,
     to see how post processing like resize, seg instances and clean affects the metric on validation set.
     """
     pass
+
+metrics = {
+    'mean_image_IoU': mean_image_IoU,
+    'metric':metric,
+    'jaccard_distance':None
+    }
 
 '''
 https://www.kaggle.com/kmader/nuclei-overview-to-submission  基于形态学清理mask。

@@ -66,11 +66,11 @@ def _each_epoch(mode, loader, model):
 #        if i == 0:
 #            common.plot_tensor(image.cpu())
 #            common.plot_tensor_mask(predicts.data.cpu())
-#            common.plot_resized_mask(predicts.data.cpu(), img_size, img_name, th = 0.2)
+#            common.plot_resized_mask(predicts.data.cpu(), img_size, img_name, opt.seg_th)
 #            print(img_size)
 #            break
         
-        ImageId_batch, EncodedPixels_batch = common.resize_tensor_2_numpy_and_encoding(predicts.data.cpu(), img_size, img_name, th = 0.2)
+        ImageId_batch, EncodedPixels_batch = common.resize_tensor_2_numpy_and_encoding(predicts.data.cpu(), img_size, img_name, opt.seg_th)
         ImageId += ImageId_batch
         EncodedPixels += EncodedPixels_batch
 

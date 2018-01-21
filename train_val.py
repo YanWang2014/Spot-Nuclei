@@ -7,6 +7,7 @@ import torch.optim.lr_scheduler as lrs
 import torch.nn as nn
 from utils import nuclei_dataset
 import torch.utils.data as data
+import torch.nn.functional as Fn
 
 
 def run():
@@ -113,8 +114,8 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
         
         loss = criterion(output, mask_var)
         losses.update(loss.data[0], image.size(0))
-        metric = common.metric(output, opt.val_label_root)
-        metrics.update(metric[0], image.size(0))
+        metric = opt.metric(Fn.sigmoid(output).data.cpu(), mask_var.data.cpu(), opt.seg_th)
+        metrics.update(metric, image.size(0))
  
         if mode == 'train':
             optimizer.zero_grad()
