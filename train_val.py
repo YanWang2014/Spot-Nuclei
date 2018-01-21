@@ -27,7 +27,7 @@ def run():
     best_loss = 10000
     
     if opt.try_resume:
-        common.resume(model, 'latest', opt.model)
+        common.resume(model, opt.resumed_check, opt.model)
 
 
     transformed_dataset_train = nuclei_dataset.NucleiDataset(root_dir=opt.train_data_root,
@@ -39,7 +39,7 @@ def run():
                                    num_workers=opt.num_workers, 
                                    pin_memory=opt.use_gpu)
     
-    transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.train_data_root,
+    transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.val_data_root,
                                              mode = 'val',
                                              transform=opt.transforms['val'])
     val_loader = data.DataLoader(transformed_dataset_val, 
@@ -55,7 +55,9 @@ def run():
     elif opt.optim_type == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
     
-    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5)
+    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, 
+                                         verbose=True, threshold=0.0001, threshold_mode='rel', 
+                                         cooldown=0, min_lr=1e-5, eps=1e-08)
 
 
     for epoch in range(opt.epochs):
@@ -111,7 +113,7 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
         
         loss = criterion(output, mask_var)
         losses.update(loss.data[0], image.size(0))
-        metric = common.metric(output, mask_var)
+        metric = common.metric(output, opt.val_label_root)
         metrics.update(metric[0], image.size(0))
  
         if mode == 'train':

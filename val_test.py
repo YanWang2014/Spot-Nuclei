@@ -19,20 +19,30 @@ def run():
         cudnn.benchmark = True
         model = model.cuda()
 
-    common.resume(model, 'best', opt.model)
+    common.resume(model, opt.resumed_check, opt.model)
     
-    transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.test_data_root,
+    transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.val_data_root,
+                                             mode = 'val_as_test', # val used in test mode
+                                             transform=opt.transforms['val'])
+    val_loader = data.DataLoader(transformed_dataset_val, 
+                                   batch_size=opt.batch_size,
+                                   shuffle=False, 
+                                   num_workers=opt.num_workers, 
+                                   pin_memory=opt.use_gpu)
+    print(len(val_loader)*opt.batch_size)
+    val_test('val', val_loader, model)
+    
+    transformed_dataset_test = nuclei_dataset.NucleiDataset(root_dir=opt.test_data_root,
                                              mode = 'test',
                                              transform=opt.transforms['test'])
-    val_loader = data.DataLoader(transformed_dataset_val, 
+    test_loader = data.DataLoader(transformed_dataset_test, 
                                    batch_size=opt.batch_size,
                                    shuffle=True, 
                                    num_workers=opt.num_workers, 
                                    pin_memory=opt.use_gpu)
-    print(len(val_loader)*opt.batch_size)
-    print('total:', len(val_loader))
+    print(len(test_loader)*opt.batch_size)
     
-    test(val_loader, model)
+    val_test('test', test_loader, model)
 
 
     
@@ -56,17 +66,19 @@ def _each_epoch(mode, loader, model):
 #        if i == 0:
 #            common.plot_tensor(image.cpu())
 #            common.plot_tensor_mask(predicts.data.cpu())
+#            common.plot_resized_mask(predicts.data.cpu(), img_size, img_name, th = 0.2)
 #            print(img_size)
+#            break
         
-        ImageId_batch, EncodedPixels_batch = common.resize_tensor_2_numpy_and_encoding(predicts.data.cpu(), img_size, img_name, th = 0.5)
+        ImageId_batch, EncodedPixels_batch = common.resize_tensor_2_numpy_and_encoding(predicts.data.cpu(), img_size, img_name, th = 0.2)
         ImageId += ImageId_batch
         EncodedPixels += EncodedPixels_batch
 
-    common.write2csv('results/'+opt.model+'.csv', ImageId, EncodedPixels)
+    common.write2csv('results/'+opt.model+'_'+mode+'.csv', ImageId, EncodedPixels)
     
 
-def test(val_loader, model):
-    return _each_epoch('test', val_loader, model)
+def val_test(mode, test_loader, model):
+    return _each_epoch(mode, test_loader, model)
 
     
 if __name__ == '__main__':

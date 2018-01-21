@@ -8,6 +8,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from skimage import morphology
+from skimage.morphology import closing, opening, disk
 import pandas as pd
 
 class AverageMeter(object):
@@ -120,7 +121,7 @@ def dice_loss(preds, trues, weight=None, is_average=True):
         trues = trues * w
     intersection = (preds * trues).sum(1)
     scores = 2. * (intersection + 1) / (preds.sum(1) + trues.sum(1) + 1) # soft dice
-    #scores = 2. * (intersection) / (preds.sum(1) + trues.sum(1) + 1e-15)
+   # scores = 2. * (intersection) / (preds.sum(1) + trues.sum(1) + 1e-15)
 
     if is_average:
         score = scores.sum()/num
@@ -218,12 +219,26 @@ def plot_tensor_mask(inp):
     plt.imshow(inp, cmap='gray')
     plt.pause(5)
     
-def metric(output, mask_var):
-    """https://www.kaggle.com/wcukierski/example-metric-implementation
-    https://www.kaggle.com/c/data-science-bowl-2018/discussion/47756
+def plot_resized_mask(predicts, img_size, img_name, th = 0.5):
+    """predicts: BCHW tensor.
+       img_size: (H, W)
     """
-    predicts = Fn.sigmoid(output)
-    return np.zeros(predicts.size(0))
+
+    resized_PIL = F.resize(F.to_pil_image(predicts[0,:,:,:]), tuple(img_size[0,:]))  # [0, 1] converted into [0, 255]
+    resized_np = np.array(resized_PIL) 
+    print(resized_np.shape)
+    print(resized_np.max())
+    print(resized_np.min())
+    plt.figure()
+    plt.imshow(resized_np, cmap='gray')
+    plt.pause(5)
+    
+    print(np.unique(resized_np))
+
+    resized_np = clean_img(resized_np, th)
+    plt.figure()
+    plt.imshow(resized_np, cmap='gray')
+    plt.pause(5)
 
 def run_length_encoding(x):
     dots = np.where(x.T.flatten() == 1)[0]
@@ -236,6 +251,13 @@ def run_length_encoding(x):
     run_lengths = ' '.join([str(r) for r in run_lengths])
     return run_lengths
 
+def clean_img(x, th):
+    """http://blog.csdn.net/haoji007/article/details/52063306
+    """
+    x[x<(th*255)] = 0
+    x[x>=(th*255)] = 255
+    return opening(closing(x, disk(1)), disk(3))
+
 def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
     """predicts: BCHW tensor.
        img_size: (H, W)
@@ -243,13 +265,14 @@ def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
     ImageId = []
     EncodedPixels = []
     for i in range(predicts.size(0)): #[0 , 1]
-        resized_PIL = F.resize(F.to_pil_image(predicts[i,:,:,:]), tuple(img_size[i,:]))
-        resized_np = np.array(resized_PIL) # [0, 1] converted into [0, 255]
+        resized_PIL = F.resize(F.to_pil_image(predicts[i,:,:,:]), tuple(img_size[i,:]))  # [0, 1] converted into [0, 255]
+        resized_np = np.array(resized_PIL) 
 #        print(resized_np.max())
 #        print(resized_np.min())
 #        print(resized_np.shape)
+        resized_np = clean_img(resized_np, th)
         resized_bool = resized_np>=(th*255)
-        
+       
         label = morphology.label(resized_bool)
         num = label.max()+1
         for m in range(1, num):
@@ -261,6 +284,20 @@ def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
 def write2csv(file, ImageId, EncodedPixels):
     df = pd.DataFrame({ 'ImageId' : ImageId , 'EncodedPixels' : EncodedPixels})
     df.to_csv(file, index=False, columns=['ImageId', 'EncodedPixels'])
+
+
+    
+def IoU(output, mask_var):
+    """Used during training and val on transformed masks
+    """
+    predicts = Fn.sigmoid(output)
+    return np.zeros(predicts.size(0))
+
+def metric (output_logits, encodings):
+    """For validation set on original masks,
+    to see how post processing like resize, seg instances and clean affects the metric on validation set.
+    """
+    pass
 
 '''
 https://www.kaggle.com/kmader/nuclei-overview-to-submission  基于形态学清理mask。

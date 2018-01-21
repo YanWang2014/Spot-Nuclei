@@ -30,7 +30,7 @@ nuclei:
     load images of different size directly (very different sizes may be a big problem). And maybe masks 
         should not be resized: resize images, predict, resize back, calculate loss and metric
     support CV
-    support more transforms, especially random ones
+    support more transforms, especially random ones like RandomCrop and rotate
 '''
 
 from PIL import Image
@@ -43,11 +43,10 @@ from utils import transforms_master
 from utils import functional_newest as F
 import random
 
-normalize = transforms_master.Normalize(mean=[0.1707, 0.1552, 0.1891], std=[0.2635, 0.2432, 0.2959])
 
 class NucleiDataset(data.Dataset):
 
-    def __init__(self, root_dir=None, mode=None, split_ratio=0.8, transform=None):
+    def __init__(self, root_dir=None, mode=None, split_ratio=0.9, transform=None):
         self.root_dir = root_dir
         self.transform = transform
         
@@ -61,9 +60,15 @@ class NucleiDataset(data.Dataset):
             self.image_names = self.image_names[: int(split_ratio*length)]
         if mode == 'val':
             self.image_names = self.image_names[int(split_ratio*length):]
+        if mode == 'val_as_test':
+            self.image_names = self.image_names[int(split_ratio*length):]     
+            mode = 'test'
         
         self.paths = [root_dir + img_name + '/images/' for img_name in self.image_names]
         self.mode = mode
+        
+        self.normalize = transforms_master.Normalize(mean=[0.1707, 0.1552, 0.1891], std=[0.2635, 0.2432, 0.2959])
+        self.color_jitter = transforms_master.ColorJitter(brightness=0.3, contrast=0.1, saturation=0.1, hue=0.3)
 
     def __len__(self):
         return len(self.image_names)
@@ -83,17 +88,18 @@ class NucleiDataset(data.Dataset):
             mask = Image.open(mask_path)
          
         if self.mode == 'train':
-            # random transforms of PIL images here
+            #random transforms of PIL images here
             if random.random() < 0.5:
                 image = F.hflip(image)
                 mask = F.hflip(mask)
             if random.random() <0.5:
                 image = F.vflip(image)
-                mask = F.vflip(mask)            
+                mask = F.vflip(mask)    
+#            image = self.color_jitter(image)
 
         if self.transform:
             image = self.transform(image)
-#            image = normalize(image)
+            image = self.normalize(image)
             if self.mode != 'test':
                 mask = F.to_grayscale(mask)
                 mask = self.transform(mask)  
