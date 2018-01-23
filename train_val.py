@@ -56,9 +56,9 @@ def run():
     elif opt.optim_type == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
     
-    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, 
+    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, 
                                          verbose=True, threshold=0.0001, threshold_mode='rel', 
-                                         cooldown=0, min_lr=1e-5, eps=1e-08)
+                                         cooldown=0, min_lr=1e-6, eps=1e-08)
 
 
     for epoch in range(opt.epochs):
@@ -70,8 +70,8 @@ def run():
         metric, loss = validate(val_loader, model, criterion, epoch)
 
         # remember best 
-        is_best = loss <= best_loss
-        best_loss = min(loss, best_loss)
+        is_best = metric >= best_metric
+        best_metric = max(metric, best_metric)
         if epoch % opt.save_freq == 0:
             common.save_checkpoint_epoch({
                     'epoch': epoch,
@@ -103,7 +103,7 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
         model.eval()
 
     for i, (image, mask, img_name)  in enumerate(loader):
-
+       
         if opt.use_gpu:
             image = image.cuda(async=True)
             mask = mask.cuda(async=True)            

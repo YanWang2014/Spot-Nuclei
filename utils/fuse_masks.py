@@ -1,6 +1,7 @@
 import numpy as np
 import os
-import cv2
+#import cv2
+import imageio
 
 train_data_root = '../data/stage1_train/' 
 
@@ -10,11 +11,11 @@ train_data_root = '../data/stage1_train/'
 mask_dir = '../data/stage1_train/0a7d30b252359a10fd298b638b90cb9ada3acced4e0c0e5a3692013f432ee4e9/masks/'
 the_images = []
 for image in os.listdir(mask_dir):
-    the_image = cv2.imread(mask_dir + image)
+    the_image = imageio.imread(mask_dir + image)
     the_images.append(the_image)
     
 the_mask = sum(the_images)
-cv2.imwrite('../data/stage1_train/0a7d30b252359a10fd298b638b90cb9ada3acced4e0c0e5a3692013f432ee4e9/images/' + 'mask.png', the_mask)
+imageio.imwrite('../data/stage1_train/0a7d30b252359a10fd298b638b90cb9ada3acced4e0c0e5a3692013f432ee4e9/images/' + 'mask.png', the_mask)
 
 
 '''for all
@@ -32,8 +33,8 @@ for image_dir in image_dirs:
     the_images = []
     for image in masks:
         the_image_dir = mask_dir + '/' + image
-        the_image = cv2.imread(the_image_dir)
+        the_image = imageio.imread(the_image_dir)
         the_images.append(the_image)
         
     the_mask = sum(the_images)
-    cv2.imwrite(train_data_root + image_dir + '/images/' + 'mask.png', the_mask)
+    imageio.imwrite(train_data_root + image_dir + '/images/' + 'mask.png', the_mask)

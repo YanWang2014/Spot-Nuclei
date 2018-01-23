@@ -2,7 +2,7 @@
 imagenet
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-nuclei:
+nuclei (without using alpha):
      0.1707
      0.1552
      0.1891
@@ -32,7 +32,8 @@ nuclei:
     support CV
     support more transforms, especially random ones like RandomCrop and rotate
 '''
-
+import sys
+sys.path.append('../')
 from PIL import Image
 import os
 import os.path
@@ -56,6 +57,7 @@ class NucleiDataset(data.Dataset):
         split_ratio = split_ratio
         np.random.seed(100)
         self.image_names = list(np.random.permutation(self.image_names))
+        
         if mode == 'train':
             self.image_names = self.image_names[: int(split_ratio*length)]
         if mode == 'val':
@@ -88,18 +90,19 @@ class NucleiDataset(data.Dataset):
             mask = Image.open(mask_path)
          
         if self.mode == 'train':
+            pass
             #random transforms of PIL images here
-            if random.random() < 0.5:
-                image = F.hflip(image)
-                mask = F.hflip(mask)
-            if random.random() <0.5:
-                image = F.vflip(image)
-                mask = F.vflip(mask)    
+#            if random.random() < 0.5:
+#                image = F.hflip(image)
+#                mask = F.hflip(mask)
+#            if random.random() <0.5:
+#                image = F.vflip(image)
+#                mask = F.vflip(mask)    
 #            image = self.color_jitter(image)
 
         if self.transform:
             image = self.transform(image)
-            image = self.normalize(image)
+#            image = self.normalize(image)
             if self.mode != 'test':
                 mask = F.to_grayscale(mask)
                 mask = self.transform(mask)  
@@ -127,6 +130,13 @@ class NucleiDataset(data.Dataset):
         background = Image.new('RGB', image.size, color)
         background.paste(image, mask=image.split()[3])  # 3 is the alpha channel
         return background
+    
+    def drop_alpha(self, image):
+        """drop alpha in PIL image directly
+        """
+        image = np.array(image)
+        image = image[...,:3]
+        return F.to_pil_image(image)
 
 if __name__ == "__main__":
     
@@ -161,9 +171,9 @@ if __name__ == "__main__":
     INPUT_WORKERS = 4
     
     if phases == 'test1':
-        test_root = 'data/stage1_test/'
+        test_root = '../data/stage1_test/'
     elif phases == 'train1':
-        test_root = 'data/stage1_train/'
+        test_root = '../data/stage1_train/'
     
     transformed_dataset_test = NucleiDataset(root_dir=test_root,
                                              mode = None,

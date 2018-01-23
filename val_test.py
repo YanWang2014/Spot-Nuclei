@@ -21,6 +21,7 @@ def run():
 
     common.resume(model, opt.resumed_check, opt.model)
     
+
     transformed_dataset_val = nuclei_dataset.NucleiDataset(root_dir=opt.val_data_root,
                                              mode = 'val_as_test', # val used in test mode
                                              transform=opt.transforms['val'])
@@ -32,16 +33,16 @@ def run():
     print(len(val_loader)*opt.batch_size)
     val_test('val', val_loader, model)
     
+    
     transformed_dataset_test = nuclei_dataset.NucleiDataset(root_dir=opt.test_data_root,
                                              mode = 'test',
                                              transform=opt.transforms['test'])
     test_loader = data.DataLoader(transformed_dataset_test, 
                                    batch_size=opt.batch_size,
-                                   shuffle=True, 
+                                   shuffle=False, 
                                    num_workers=opt.num_workers, 
                                    pin_memory=opt.use_gpu)
     print(len(test_loader)*opt.batch_size)
-    
     val_test('test', test_loader, model)
 
 
@@ -55,7 +56,8 @@ def _each_epoch(mode, loader, model):
     for i, (image, img_name, img_size)  in enumerate(loader):
 #        if i%10 == 0:
 #            print(i)
-
+        print(image.size())
+            
         if opt.use_gpu:
             image = image.cuda(async=True)
         input_var = torch.autograd.Variable(image, volatile=(mode != 'train'))
