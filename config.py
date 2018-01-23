@@ -13,7 +13,6 @@ class Config(object):
     
     train_data_root = 'data/stage1_train/' 
     val_data_root = 'data/stage1_train/'
-    val_label_root = 'data/stage1_train/stage1_train_labels.cvs'
     test_data_root = 'data/stage1_test/' 
 
     try_resume = False

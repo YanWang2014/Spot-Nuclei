@@ -235,7 +235,7 @@ def plot_resized_mask(predicts, img_size, img_name, th = 0.5):
     
     print(np.unique(resized_np))
 
-    resized_np = clean_img(resized_np, th)
+#    resized_np = clean_img(resized_np, th)
     plt.figure()
     plt.imshow(resized_np, cmap='gray')
     plt.pause(5)
@@ -251,12 +251,12 @@ def run_length_encoding(x):
     run_lengths = ' '.join([str(r) for r in run_lengths])
     return run_lengths
 
-def clean_img(x, th):
-    """http://blog.csdn.net/haoji007/article/details/52063306
-    """
-    x[x<(th*255)] = 0
-    x[x>=(th*255)] = 255
-    return opening(closing(x, disk(1)), disk(3))
+#def clean_img(x, th):
+#    """http://blog.csdn.net/haoji007/article/details/52063306
+#    """
+#    x[x<(th*255)] = 0
+#    x[x>=(th*255)] = 255
+#    return opening(closing(x, disk(1)), disk(3))
 
 def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
     """predicts: BCHW tensor.
@@ -270,7 +270,7 @@ def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
 #        print(resized_np.max())
 #        print(resized_np.min())
 #        print(resized_np.shape)
-        resized_np = clean_img(resized_np, th)
+#        resized_np = clean_img(resized_np, th)
         resized_bool = resized_np>=(th*255)
        
         label = morphology.label(resized_bool)
