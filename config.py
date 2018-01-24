@@ -18,7 +18,7 @@ class Config(object):
     try_resume = False
     resumed_check = 'best'
 
-    model = 'UNet256_3x3'
+    model = 'LinkNet34'
     num_classes = 1
     
     input_size = 256
@@ -30,7 +30,7 @@ class Config(object):
                  }
 
     
-    batch_size = 64
+    batch_size = 8
     epochs = 200
     save_freq = 20
 
@@ -50,7 +50,7 @@ class Config(object):
     if_debug = False
     print_freq = 1
     
-    seg_th = 0.5
+    seg_th = 0.29
 
 
 opt = Config()

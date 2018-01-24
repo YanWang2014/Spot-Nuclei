@@ -6,7 +6,7 @@ import torch.nn as nn
 from utils import nuclei_dataset
 import torch.utils.data as data
 import torch.nn.functional as Fn
- 
+import numpy as np
     
 def run():
     model = net_factory.loader(opt.model, opt.num_classes)
@@ -31,7 +31,7 @@ def run():
                                    num_workers=opt.num_workers, 
                                    pin_memory=opt.use_gpu)
     print(len(val_loader)*opt.batch_size)
-    val_test('val', val_loader, model)
+#    val_test('val', val_loader, model)
     
     
     transformed_dataset_test = nuclei_dataset.NucleiDataset(root_dir=opt.test_data_root,
@@ -65,18 +65,19 @@ def _each_epoch(mode, loader, model):
         logits = model(input_var)
         predicts = Fn.sigmoid(logits) # between 0 and 1
         
-#        if i == 0:
-#            common.plot_tensor(image.cpu())
-#            common.plot_tensor_mask(predicts.data.cpu())
-#            common.plot_resized_mask(predicts.data.cpu(), img_size, img_name, opt.seg_th)
-#            print(img_size)
-#            break
+        if opt.if_debug:
+            print('check')
+            common.plot_tensor(image.cpu())
+            common.plot_tensor_mask(predicts.data.cpu())
+            common.plot_resized_mask(predicts.data.cpu(), img_size, img_name, opt.seg_th)
+            print(img_size)
         
         ImageId_batch, EncodedPixels_batch = common.resize_tensor_2_numpy_and_encoding(predicts.data.cpu(), img_size, img_name, opt.seg_th)
         ImageId += ImageId_batch
         EncodedPixels += EncodedPixels_batch
 
     common.write2csv('results/'+opt.model+'_'+mode+'.csv', ImageId, EncodedPixels)
+    print(len(np.unique(ImageId)))
     
 
 def val_test(mode, test_loader, model):

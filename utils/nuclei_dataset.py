@@ -55,7 +55,7 @@ class NucleiDataset(data.Dataset):
         
         length = len(self.image_names)
         split_ratio = split_ratio
-        np.random.seed(100)
+        np.random.seed(1000)
         self.image_names = list(np.random.permutation(self.image_names))
         
         if mode == 'train':

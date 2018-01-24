@@ -221,7 +221,7 @@ def plot_tensor(inp2):
     inp2 = np.clip(inp2, 0, 1)
     plt.figure()
     plt.imshow(inp2)
-    plt.pause(5)
+    plt.pause(2)
     
 def plot_tensor_mask(inp):    
     inp = inp[0,:,:,:]
@@ -231,29 +231,36 @@ def plot_tensor_mask(inp):
     print(inp.max())
     print(inp.min())
     plt.figure()
+    plt.hist(inp)
+    plt.pause(2)    
+    plt.figure()
     plt.imshow(inp, cmap='gray')
-    plt.pause(5)
+    plt.pause(2)
     
-def plot_resized_mask(predicts, img_size, img_name, th = 0.5):
+def plot_resized_mask(predicts, img_size, img_name, th):
     """predicts: BCHW tensor.
        img_size: (H, W)
     """
-
+    print("plot_resized_mask")
     resized_PIL = F.resize(F.to_pil_image(predicts[0,:,:,:]), tuple(img_size[0,:]))  # [0, 1] converted into [0, 255]
     resized_np = np.array(resized_PIL) 
+    print(tuple(img_size[0,:]))
     print(resized_np.shape)
     print(resized_np.max())
     print(resized_np.min())
     plt.figure()
+    plt.hist(resized_np)
+    plt.pause(2)  
+    plt.figure()
     plt.imshow(resized_np, cmap='gray')
-    plt.pause(5)
+    plt.pause(2)
     
     print(np.unique(resized_np))
 
 #    resized_np = clean_img(resized_np, th)
     plt.figure()
     plt.imshow(resized_np, cmap='gray')
-    plt.pause(5)
+    plt.pause(2)
 
 def run_length_encoding(x):
     dots = np.where(x.T.flatten() == 1)[0]
@@ -263,7 +270,7 @@ def run_length_encoding(x):
         if (b>prev+1): run_lengths.extend((b + 1, 0))
         run_lengths[-1] += 1
         prev = b
-    #run_lengths = ' '.join([str(r) for r in run_lengths])
+    run_lengths = ' '.join([str(r) for r in run_lengths])
     return run_lengths
 
 #def clean_img(x, th):
@@ -273,7 +280,7 @@ def run_length_encoding(x):
 #    x[x>=(th*255)] = 255
 #    return opening(closing(x, disk(1)), disk(3))
 
-def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
+def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th):
     """predicts: BCHW tensor.
        img_size: (H, W)
     """
@@ -286,7 +293,10 @@ def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th = 0.5):
 #        print(resized_np.min())
 #        print(resized_np.shape)
 #        resized_np = clean_img(resized_np, th)
-        resized_bool = resized_np>=(th*255)
+#        plt.figure()
+#        plt.hist(resized_np)
+#        plt.pause(2) 
+        resized_bool = resized_np>(th*255)
        
         label = morphology.label(resized_bool)
         num = label.max()+1
