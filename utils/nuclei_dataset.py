@@ -83,7 +83,7 @@ class NucleiDataset(data.Dataset):
         
         image = Image.open(img_path)
         if image.mode == 'RGBA':
-            image = self.pil_alpha_to_color_v2(image)
+            image = self.drop_alpha(image)
         image_size = image.size
         
         if self.mode != 'test':

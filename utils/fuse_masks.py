@@ -37,4 +37,6 @@ for image_dir in image_dirs:
         the_images.append(the_image)
         
     the_mask = sum(the_images)
+    #print(np.unique(the_mask))
+    assert(list(np.unique(the_mask)) == [0,255])
     imageio.imwrite(train_data_root + image_dir + '/images/' + 'mask.png', the_mask)

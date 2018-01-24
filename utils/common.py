@@ -139,7 +139,8 @@ class DiceLoss(nn.Module):
         self.size_average = size_average
 
     def forward(self, input, target, weight=None):
-        return 1-dice_loss(Fn.sigmoid(input), target, weight=weight, is_average=self.size_average)
+        return -dice_loss(Fn.sigmoid(input), target, weight=weight, is_average=self.size_average)
+        #return 1-dice_loss(Fn.sigmoid(input), target, weight=weight, is_average=self.size_average)
 
 class BCEDiceLoss(nn.Module):
     def __init__(self, size_average=True):
@@ -148,7 +149,21 @@ class BCEDiceLoss(nn.Module):
         self.dice = DiceLoss(size_average=size_average)
 
     def forward(self, input, target, weight=None):
-        return nn.modules.loss.BCEWithLogitsLoss(size_average=self.size_average, weight=weight)(input, target) + self.dice(input, target, weight=weight)
+        return nn.modules.loss.BCEWithLogitsLoss(size_average=self.size_average, weight=weight)(input, target)*0.5 + self.dice(input, target, weight=weight)
+        #return nn.modules.loss.BCEWithLogitsLoss(size_average=self.size_average, weight=weight)(input, target) + self.dice(input, target, weight=weight)
+
+'''
+BCEDiceLoss
+
+https://www.kaggle.com/takuok/keras-generator-starter-lb-0-326
+Epoch 1/10
+101/100 [==============================] - 105s 1s/step - loss: -0.6069 - mean_iou: 0.6256 - val_loss: -0.7858 - val_mean_iou: 0.7488
+Epoch 2/10
+101/100 [==============================] - 95s 942ms/step - loss: -0.8007 - mean_iou: 0.7810 - val_loss: -0.8263 - val_mean_iou: 0.8032
+
+Humm...
+Here is 10 epochs training log and LB score 0.302.
+'''
 
 class UNet11_Loss: 
     """Vladimir’s Approach, same as BCEDiceLoss (different eps settings)
@@ -248,7 +263,7 @@ def run_length_encoding(x):
         if (b>prev+1): run_lengths.extend((b + 1, 0))
         run_lengths[-1] += 1
         prev = b
-    run_lengths = ' '.join([str(r) for r in run_lengths])
+    #run_lengths = ' '.join([str(r) for r in run_lengths])
     return run_lengths
 
 #def clean_img(x, th):

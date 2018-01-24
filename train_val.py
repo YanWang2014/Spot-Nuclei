@@ -56,7 +56,7 @@ def run():
     elif opt.optim_type == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
     
-    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, 
+    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, 
                                          verbose=True, threshold=0.0001, threshold_mode='rel', 
                                          cooldown=0, min_lr=1e-6, eps=1e-08)
 

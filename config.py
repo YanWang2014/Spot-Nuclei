@@ -31,21 +31,21 @@ class Config(object):
 
     
     batch_size = 64
-    epochs = 100
+    epochs = 200
     save_freq = 20
 
     optim_type = 'SGD'
-    lr = 0.01 # 0.001
-    momentum = 0.9
-    weight_decay = 0.0001#1e-4 
+    lr = 0.02 # 0.001
+    momentum = 0.95
+    weight_decay = 0.000#1e-4 
     
-    criterion = common.losses['BCELoss2d']()
+    criterion = common.losses['BCELoss2d']() #BCEDiceLoss  -0.8263 达到了, BCELoss2d: 0.0057
     metric = common.metrics['mean_image_IoU']()
     
     
     use_gpu = torch.cuda.is_available()
     use_multi_gpu = torch.cuda.device_count() > 1
-    num_workers = 8
+    num_workers = 4
     
     if_debug = False
     print_freq = 1
