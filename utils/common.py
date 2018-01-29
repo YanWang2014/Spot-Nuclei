@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from skimage import morphology
 from skimage.morphology import closing, opening, disk
 import pandas as pd
+from PIL import Image
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

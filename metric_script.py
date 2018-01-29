@@ -12,7 +12,7 @@ calculate metric based on two csvs (which is better for offline validation) or t
 import pandas as pd
 
 target = pd.read_csv('data/stage1_train_labels.csv')
-source = pd.read_csv('results/LinkNet18_val.csv')
+source = pd.read_csv('results/UnetVgg11_val.csv')
 
 
 def submit_metric(source, target):

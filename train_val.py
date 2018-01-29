@@ -8,7 +8,7 @@ import torch.nn as nn
 from utils import nuclei_dataset
 import torch.utils.data as data
 import torch.nn.functional as Fn
-
+import numpy as np
 
 def run():
     model = net_factory.loader(opt.model, opt.num_classes)
@@ -56,7 +56,7 @@ def run():
     elif opt.optim_type == 'SGD':
         optimizer = optim.SGD(model.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
     
-    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, 
+    lr_scheduler = lrs.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, 
                                          verbose=True, threshold=0.0001, threshold_mode='rel', 
                                          cooldown=0, min_lr=1e-6, eps=1e-08)
 
@@ -122,6 +122,7 @@ def _each_epoch(mode, loader, model, criterion, optimizer=None, epoch=None):
             loss.backward()
             optimizer.step()
 
+#        print(np.unique(mask_var.data.cpu().numpy()))
         
         if opt.if_debug and i % opt.print_freq == 0: 
             print('Epoch: [{0}][{1}/{2}]\t'

@@ -18,7 +18,7 @@ class Config(object):
     try_resume = False
     resumed_check = 'best'
 
-    model = 'LinkNet34'
+    model = 'UNet256_3x3'
     num_classes = 1
     
     input_size = 256
@@ -30,7 +30,7 @@ class Config(object):
                  }
 
     
-    batch_size = 32
+    batch_size = 128
     epochs = 200
     save_freq = 20
 
@@ -45,7 +45,7 @@ class Config(object):
     
     use_gpu = torch.cuda.is_available()
     use_multi_gpu = torch.cuda.device_count() > 1
-    num_workers = 4
+    num_workers = 8
     
     if_debug = False
     print_freq = 1

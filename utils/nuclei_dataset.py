@@ -43,7 +43,17 @@ import numpy as np
 from utils import transforms_master
 from utils import functional_newest as F
 import random
+#import cv2
 
+class Convert2Binary():
+    
+    def __call__(self, image):
+        image = np.array(image)
+#        image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)[1]
+        image[image>128] = 255
+        image[image<=128] = 0
+        image = image[:, :, np.newaxis]
+        return F.to_pil_image(image)
 
 class NucleiDataset(data.Dataset):
 
@@ -71,6 +81,10 @@ class NucleiDataset(data.Dataset):
         
         self.normalize = transforms_master.Normalize(mean=[0.1707, 0.1552, 0.1891], std=[0.2635, 0.2432, 0.2959])
         self.color_jitter = transforms_master.ColorJitter(brightness=0.3, contrast=0.1, saturation=0.1, hue=0.3)
+        self.mask_transform = transforms_master.Compose([transforms_master.Resize((256,256)),
+                                          Convert2Binary(),
+                                          transforms_master.ToTensor()]
+                                         )
 
     def __len__(self):
         return len(self.image_names)
@@ -105,7 +119,7 @@ class NucleiDataset(data.Dataset):
 #            image = self.normalize(image)
             if self.mode != 'test':
                 mask = F.to_grayscale(mask)
-                mask = self.transform(mask)  
+                mask = self.mask_transform(mask)  
 #        print(image.size())
         if self.mode != 'test':
             return image, mask, img_name
