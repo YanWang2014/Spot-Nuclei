@@ -25,6 +25,7 @@ http://brainiac2.mit.edu/isbi_challenge/
     https://www.zhihu.com/question/57403701   
     https://github.com/TuSimple/mx-maskrcnn （Resnet-50-FPN）
     https://github.com/matterport/Mask_RCNN (Keras and TensorFlow， ResNet101有coco的权重！！！)
+    https://github.com/soeaver/Pytorch_Mask_RCNN  (同上，稍弱一点)
     
     Recurrent Neural Networks for Semantic Instance Segmentation (PyTorch)
         https://github.com/imatge-upc/rsis 

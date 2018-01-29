@@ -56,7 +56,8 @@ def _each_epoch(mode, loader, model):
     for i, (image, img_name, img_size)  in enumerate(loader):
 #        if i%10 == 0:
 #            print(i)
-        print(image.size())
+#        print('tuple')
+#        print(img_size)
             
         if opt.use_gpu:
             image = image.cuda(async=True)

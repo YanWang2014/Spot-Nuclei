@@ -110,6 +110,8 @@ class NucleiDataset(data.Dataset):
         if self.mode != 'test':
             return image, mask, img_name
         else:
+#            print('true')
+#            print(np.array(image_size))
             return image, img_name, np.array(image_size)
     
     def pil_alpha_to_color_v2(self, image, color=(255, 255, 255)):
@@ -134,9 +136,14 @@ class NucleiDataset(data.Dataset):
     def drop_alpha(self, image):
         """drop alpha in PIL image directly
         """
+#        print('drop_alpha')
+#        print(image.size)
         image = np.array(image)
         image = image[...,:3]
-        return F.to_pil_image(image)
+#        print(image.shape)
+        image = F.to_pil_image(image)
+#        print(image.size)
+        return image
 
 if __name__ == "__main__":
     

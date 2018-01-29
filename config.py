@@ -30,7 +30,7 @@ class Config(object):
                  }
 
     
-    batch_size = 8
+    batch_size = 32
     epochs = 200
     save_freq = 20
 

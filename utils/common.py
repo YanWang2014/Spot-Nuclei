@@ -287,15 +287,21 @@ def resize_tensor_2_numpy_and_encoding(predicts, img_size, img_name, th):
     ImageId = []
     EncodedPixels = []
     for i in range(predicts.size(0)): #[0 , 1]
-        resized_PIL = F.resize(F.to_pil_image(predicts[i,:,:,:]), tuple(img_size[i,:]))  # [0, 1] converted into [0, 255]
+#        print('Tesnor')
+#        print(predicts[i,:,:,:].size())
+        resized_PIL = F.resize(F.to_pil_image(predicts[i,:,:,:]), (img_size[i,1],img_size[i,0]))  # [0, 1] converted into [0, 255]
+#        print('PIL')
+#        print(resized_PIL.size)
         resized_np = np.array(resized_PIL) 
 #        print(resized_np.max())
 #        print(resized_np.min())
+#        print('numpy')
 #        print(resized_np.shape)
 #        resized_np = clean_img(resized_np, th)
 #        plt.figure()
 #        plt.hist(resized_np)
 #        plt.pause(2) 
+        resized_np = resized_np.transpose((1, 0))
         resized_bool = resized_np>(th*255)
        
         label = morphology.label(resized_bool)
